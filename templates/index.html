@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>أداة مراجعة الوسوم / Annotation Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 32px;
+            line-height: 1.8;
+            background: #ffffff;
+        }
+
+        .card {
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        .box {
+            background: #f7f7f7;
+            padding: 18px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+        }
+
+        .context {
+            direction: rtl;
+            text-align: right;
+            font-size: 20px;
+            line-height: 2;
+            white-space: pre-wrap;
+        }
+
+        .meta {
+            font-size: 15px;
+            color: #444;
+        }
+
+        mark {
+            background: yellow;
+            font-weight: bold;
+            padding: 2px 4px;
+        }
+
+        input[type="text"], textarea, select {
+            width: 100%;
+            max-width: 1000px;
+            padding: 10px;
+            margin-top: 6px;
+            margin-bottom: 14px;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        textarea {
+            min-height: 100px;
+        }
+
+        .buttons button,
+        .phase-links a {
+            display: inline-block;
+            padding: 10px 16px;
+            margin-top: 8px;
+            margin-right: 8px;
+            font-size: 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #e9e9e9;
+            text-decoration: none;
+            color: black;
+        }
+
+        .buttons button:hover,
+        .phase-links a:hover {
+            background: #dcdcdc;
+        }
+
+        .active-phase {
+            background: #cfe8ff !important;
+            font-weight: bold;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+        .hidden-note {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .success {
+            background: #eef9ee;
+            border: 1px solid #b7e2b7;
+        }
+    </style>
+
+    <script>
+        let annotationStartTime = Date.now();
+
+        function toggleCorrectionFields() {
+            const decision = document.querySelector('input[name="decision"]:checked');
+            const correctionFields = document.getElementById("correction-fields");
+            const correctTag = document.getElementById("correct_tag");
+            const correctSpan = document.getElementById("correct_span");
+
+            if (!decision) {
+                correctionFields.style.display = "none";
+                correctTag.required = false;
+                correctSpan.required = false;
+                return;
+            }
+
+            const value = decision.value;
+
+            if (value === "correct") {
+                correctionFields.style.display = "none";
+                correctTag.required = false;
+                correctSpan.required = false;
+            } else {
+                correctionFields.style.display = "block";
+
+                if (value === "tag_error") {
+                    correctTag.required = true;
+                    correctSpan.required = false;
+                } else if (value === "span_error") {
+                    correctTag.required = false;
+                    correctSpan.required = true;
+                } else if (value === "both") {
+                    correctTag.required = true;
+                    correctSpan.required = true;
+                }
+            }
+        }
+
+        function recordAnnotationTime() {
+            const elapsed = (Date.now() - annotationStartTime) / 1000;
+            const target = document.getElementById("annotation_time_seconds");
+            if (target) {
+                target.value = elapsed.toFixed(2);
+            }
+        }
+
+        window.onload = function() {
+            annotationStartTime = Date.now();
+            toggleCorrectionFields();
+        };
+    </script>
+</head>
+<body>
+<div class="card">
+
+    <h2>أداة مراجعة الوسوم التفسيرية / Tafsir Annotation Tool</h2>
+
+    <div class="box">
+        <div class="label">مرحلة المراجعة / Annotation Phase</div>
+        <div>{{ phase_label }}</div>
+
+        <div class="phase-links" style="margin-top:10px;">
+            <a href="/?phase=high{% if annotator %}&annotator={{ annotator }}{% endif %}" class="{% if phase == 'high' %}active-phase{% endif %}">
+                الوسوم الأعلى / High
+            </a>
+            <a href="/?phase=medium{% if annotator %}&annotator={{ annotator }}{% endif %}" class="{% if phase == 'medium' %}active-phase{% endif %}">
+                الوسوم المتوسطة / Medium
+            </a>
+            <a href="/?phase=low{% if annotator %}&annotator={{ annotator }}{% endif %}" class="{% if phase == 'low' %}active-phase{% endif %}">
+                الوسوم الأقل / Low
+            </a>
+            <a href="/?phase=rare{% if annotator %}&annotator={{ annotator }}{% endif %}" class="{% if phase == 'rare' %}active-phase{% endif %}">
+                مجموعة النادر / Rare
+            </a>
+        </div>
+    </div>
+
+    {% if not annotator %}
+        <form method="GET" action="/">
+            <input type="hidden" name="phase" value="{{ phase }}">
+            <label class="label">اسم المقيّم / Annotator Name</label>
+            <input type="text" name="annotator" required placeholder="أدخل اسم المقيّم / Enter annotator name">
+            <button type="submit">ابدأ / Start</button>
+        </form>
+
+    {% elif finished %}
+        <div class="box success">
+            <b>تم الانتهاء من هذه المرحلة / This phase is complete.</b>
+            <div style="margin-top:10px;">
+                يمكنك الانتقال إلى المرحلة التالية من الأعلى.
+                <br>
+                You can switch to the next phase using the buttons above.
+            </div>
+        </div>
+
+    {% elif item %}
+        <div class="meta">
+            <div><b>المقيّم / Annotator:</b> {{ annotator }}</div>
+            <div><b>المرحلة / Phase:</b> {{ phase_label }}</div>
+            <div><b>المتبقي / Remaining:</b> {{ remaining }}</div>
+            <div><b>الإجمالي / Total:</b> {{ total }}</div>
+            <div><b>صف CSV / CSV Row:</b> {{ item.csv_row }}</div>
+            <div><b>البلوك / Block:</b> {{ item.block_id }} | <b>القطعة / Chunk:</b> {{ item.chunk_global_id }}</div>
+
+            {% if phase == 'rare' %}
+            <div><b>filled_cols:</b> {{ item.filled_cols }}</div>
+            <div><b>frequency_rank:</b> {{ item.frequency_rank }}</div>
+            {% endif %}
+        </div>
+
+        <div class="box">
+            <div class="label">الوسم المتوقع / Predicted Tag</div>
+            <div>{{ item.predicted_tag_display }}</div>
+        </div>
+
+        <div class="box">
+            <div class="label">النص المعلَّم / Predicted Span</div>
+            <div class="context">{{ item.predicted_span }}</div>
+        </div>
+
+        <div class="box">
+            <div class="label">السياق / Context</div>
+            <div class="context">{{ item.highlighted_context|safe }}</div>
+        </div>
+
+        <details class="box">
+            <summary><b>إظهار سياق القطعة كاملًا / Show Full Chunk Context</b></summary>
+            <div class="context" style="margin-top:12px;">{{ item.chunk_context }}</div>
+        </details>
+
+        <details class="box">
+            <summary><b>إظهار سياق المقطع كاملًا / Show Full Section Context</b></summary>
+            <div class="context" style="margin-top:12px;">{{ item.section_context }}</div>
+        </details>
+
+        <form method="POST" action="/">
+            <input type="hidden" name="annotator" value="{{ annotator }}">
+            <input type="hidden" name="current_pos" value="{{ current_pos }}">
+            <input type="hidden" name="phase" value="{{ phase }}">
+            <input type="hidden" name="annotation_time_seconds" id="annotation_time_seconds">
+
+            <div class="box">
+                <div class="label">القرار / Decision</div>
+
+                <label>
+                    <input type="radio" name="decision" value="correct" onchange="toggleCorrectionFields()" required>
+                    صحيح / Correct
+                </label><br>
+
+                <label>
+                    <input type="radio" name="decision" value="tag_error" onchange="toggleCorrectionFields()">
+                    خطأ في الوسم / Tag Error
+                </label><br>
+
+                <label>
+                    <input type="radio" name="decision" value="span_error" onchange="toggleCorrectionFields()">
+                    خطأ في المدى النصي / Span Error
+                </label><br>
+
+                <label>
+                    <input type="radio" name="decision" value="both" onchange="toggleCorrectionFields()">
+                    الخطآن معًا / Both
+                </label>
+            </div>
+
+            <div id="correction-fields" class="box" style="display:none;">
+                <label class="label" for="correct_tag">الوسم الصحيح / Correct Tag</label>
+                <select name="correct_tag" id="correct_tag">
+                    <option value="">-- اختر الوسم / Select Tag --</option>
+                    {% for tag in tag_options %}
+                        <option value="{{ tag }}">{{ tag_labels_ar.get(tag, tag) }} / {{ tag }}</option>
+                    {% endfor %}
+                </select>
+
+                <label class="label" for="correct_span">المدى النصي الصحيح / Correct Span</label>
+                <textarea name="correct_span" id="correct_span" placeholder="اكتب المدى الصحيح هنا / Enter corrected span here"></textarea>
+
+                <div class="hidden-note">
+                    إذا كان الخطأ في الوسم فاختر الوسم الصحيح. وإذا كان الخطأ في المدى النصي فاكتب المدى الصحيح. وإذا كان الخطأ فيهما معًا فاملأ الحقلين.
+                    <br>
+                    If the error is in the tag, select the correct tag. If the error is in the span, enter the corrected span. If both are wrong, fill both fields.
+                </div>
+            </div>
+
+            <div class="box">
+                <label class="label" for="notes">ملاحظات / Notes</label>
+                <textarea name="notes" id="notes" placeholder="ملاحظات اختيارية / Optional comments"></textarea>
+            </div>
+
+            <div class="buttons">
+                <button type="submit" onclick="recordAnnotationTime()">حفظ والانتقال إلى التالي / Save and Next</button>
+            </div>
+        </form>
+    {% endif %}
+</div>
+</body>
+</html>
